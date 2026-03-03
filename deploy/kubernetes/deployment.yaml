@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nats-jetstream-kv-resp
+  namespace: spinkube
+  labels:
+    app: nats-jetstream-kv-resp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nats-jetstream-kv-resp
+  template:
+    metadata:
+      labels:
+        app: nats-jetstream-kv-resp
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: kv-resp
+          image: ghcr.io/gftdcojp/nats-jetstream-kv-resp:0.1.0
+          args: ["-config", "/etc/kvresp/config.yaml"]
+          ports:
+            - name: resp
+              containerPort: 6380
+              protocol: TCP
+            - name: health
+              containerPort: 6381
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/kvresp
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: nats-jetstream-kv-resp-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats-jetstream-kv-resp
+  namespace: spinkube
+  labels:
+    app: nats-jetstream-kv-resp
+spec:
+  type: ClusterIP
+  ports:
+    - name: resp
+      port: 6380
+      targetPort: resp
+    - name: health
+      port: 6381
+      targetPort: health
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+  selector:
+    app: nats-jetstream-kv-resp
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nats-jetstream-kv-resp-config
+  namespace: spinkube
+data:
+  config.yaml: |
+    nats:
+      url: "nats://nats.wasmcloud-system:4222"
+      max_reconnects: -1
+      reconnect_wait: "2s"
+    server:
+      listen_addr: ":6380"
+      max_connections: 1024
+    buckets:
+      - name: "performers"
+      - name: "sessions"
+    ttl:
+      enabled: true
+      reaper_interval: "1s"
+    observability:
+      metrics:
+        enabled: true
+        listen: ":9090"
+      health:
+        enabled: true
+        listen: ":6381"
+      logging:
+        level: "info"
+        format: "json"

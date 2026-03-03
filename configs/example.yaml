@@ -1,0 +1,35 @@
+nats:
+  url: "nats://nats.wasmcloud-system:4222"
+  connection_name: "kv-resp-bridge"
+  max_reconnects: -1
+  reconnect_wait: "2s"
+
+server:
+  listen_addr: ":6380"
+  max_connections: 1024
+
+buckets:
+  - name: "performers"   # SELECT 0
+  - name: "sessions"     # SELECT 1
+
+auth:
+  enabled: false
+  password: ""
+
+ttl:
+  enabled: true
+  reaper_interval: "1s"
+
+observability:
+  metrics:
+    enabled: true
+    listen: ":9090"
+    path: "/metrics"
+  health:
+    enabled: true
+    listen: ":6381"
+    liveness_path: "/healthz"
+    readiness_path: "/readyz"
+  logging:
+    level: "info"
+    format: "json"

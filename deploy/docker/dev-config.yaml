@@ -1,0 +1,29 @@
+nats:
+  url: "nats://nats:4222"
+  max_reconnects: -1
+  reconnect_wait: "2s"
+
+server:
+  listen_addr: ":6380"
+  max_connections: 1024
+
+buckets:
+  - name: "performers"
+  - name: "sessions"
+
+ttl:
+  enabled: true
+  reaper_interval: "1s"
+
+observability:
+  metrics:
+    enabled: true
+    listen: ":9090"
+  health:
+    enabled: true
+    listen: ":6381"
+    liveness_path: "/healthz"
+    readiness_path: "/readyz"
+  logging:
+    level: "debug"
+    format: "console"
