@@ -10,6 +10,7 @@ import (
 	natsserver "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"go.uber.org/zap"
 )
 
 func startTestServer(t *testing.T) (*server.Server, *nats.Conn, jetstream.JetStream) {
@@ -43,12 +44,19 @@ func startTestServer(t *testing.T) (*server.Server, *nats.Conn, jetstream.JetStr
 	return ns, nc, js
 }
 
+func newBackend(t *testing.T, nc *nats.Conn, js jetstream.JetStream, buckets []string) store.Backend {
+	t.Helper()
+	be, err := store.NewNATSBackend(nc, js, buckets, 5*time.Second, zap.NewNop())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return be
+}
+
 func TestNATSBackend_GetPut(t *testing.T) {
 	_, nc, js := startTestServer(t)
 	ctx := context.Background()
-
-	buckets := []store.BucketConfig{{Name: "test"}}
-	be := store.NewNATSBackend(nc, js, buckets)
+	be := newBackend(t, nc, js, []string{"test"})
 
 	// Put
 	_, err := be.Put(ctx, "hello", []byte("world"))
@@ -80,9 +88,7 @@ func TestNATSBackend_GetPut(t *testing.T) {
 func TestNATSBackend_Create(t *testing.T) {
 	_, nc, js := startTestServer(t)
 	ctx := context.Background()
-
-	buckets := []store.BucketConfig{{Name: "test"}}
-	be := store.NewNATSBackend(nc, js, buckets)
+	be := newBackend(t, nc, js, []string{"test"})
 
 	_, err := be.Create(ctx, "unique", []byte("value"))
 	if err != nil {
@@ -99,9 +105,7 @@ func TestNATSBackend_Create(t *testing.T) {
 func TestNATSBackend_Keys(t *testing.T) {
 	_, nc, js := startTestServer(t)
 	ctx := context.Background()
-
-	buckets := []store.BucketConfig{{Name: "test"}}
-	be := store.NewNATSBackend(nc, js, buckets)
+	be := newBackend(t, nc, js, []string{"test"})
 
 	be.Put(ctx, "a", []byte("1"))
 	be.Put(ctx, "b", []byte("2"))
@@ -126,8 +130,7 @@ func TestNATSBackend_SwitchBucket(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	buckets := []store.BucketConfig{{Name: "test"}, {Name: "sessions"}}
-	be := store.NewNATSBackend(nc, js, buckets)
+	be := newBackend(t, nc, js, []string{"test", "sessions"})
 
 	if be.ActiveBucket() != "test" {
 		t.Fatalf("expected active bucket 'test', got %q", be.ActiveBucket())
@@ -144,9 +147,7 @@ func TestNATSBackend_SwitchBucket(t *testing.T) {
 
 func TestNATSBackend_IsConnected(t *testing.T) {
 	_, nc, js := startTestServer(t)
-
-	buckets := []store.BucketConfig{{Name: "test"}}
-	be := store.NewNATSBackend(nc, js, buckets)
+	be := newBackend(t, nc, js, []string{"test"})
 
 	if !be.IsConnected() {
 		t.Fatal("expected IsConnected=true")
@@ -156,9 +157,7 @@ func TestNATSBackend_IsConnected(t *testing.T) {
 func TestNATSBackend_PurgeAll(t *testing.T) {
 	_, nc, js := startTestServer(t)
 	ctx := context.Background()
-
-	buckets := []store.BucketConfig{{Name: "test"}}
-	be := store.NewNATSBackend(nc, js, buckets)
+	be := newBackend(t, nc, js, []string{"test"})
 
 	be.Put(ctx, "x", []byte("y"))
 	be.Put(ctx, "z", []byte("w"))
@@ -169,7 +168,6 @@ func TestNATSBackend_PurgeAll(t *testing.T) {
 	}
 
 	// After purge, keys should be gone
-	// Allow brief delay for purge to propagate
 	time.Sleep(50 * time.Millisecond)
 
 	keys, _ := be.Keys(ctx)

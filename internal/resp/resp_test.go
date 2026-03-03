@@ -103,7 +103,7 @@ func TestWriter_Integer(t *testing.T) {
 func TestWriter_Error(t *testing.T) {
 	var buf bytes.Buffer
 	w := resp.NewWriter(&buf)
-	if err := w.WriteError("ERR test error"); err != nil {
+	if err := w.WriteError("test error"); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.Flush(); err != nil {
